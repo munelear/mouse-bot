@@ -1,18 +1,5 @@
 const { RichEmbed } = require("discord.js");
-const fuzzy = require("fuzzy-predicate");
-const requiredCharacters = require("./../modules/common-characters.js");
-const requiredShips = require("./../modules/common-ships.js");
-
-const shardsRemainingAtStarLevel = {
-    0: 330,
-    1: 320,
-    2: 305,
-    3: 280,
-    4: 250,
-    5: 185,
-    6: 100,
-    7: 0
-};
+const rosterAnalyzer = require("./../modules/roster-analyzer.js");
 
 exports.run = async (client, message, cmd, args, level) => { // eslint-disable-line no-unused-vars
 
@@ -50,63 +37,19 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
             .setTitle(`${profile.username}'s${allyCodeDisplay} Key Units Report`)
             .setURL(`https://swgoh.gg/u/${encodeURI(id)}/collection/`);
 
-        const missingCharacters = [];
-        let totalAcquiredShards = 0;
-        let totalRequiredShards = 0;
+        const rosterStatus = rosterAnalyzer(characterCollection, shipCollection, charactersData, shipsData);
 
-        const notActivated = [];
-        requiredCharacters.forEach(character => {
-            const lookup = charactersData.filter(fuzzy(character.name, ["name", "nickname"]));
-            if (!lookup) console.log("I couldn't find: " + character.name);
-            if (lookup.length > 1) console.log("I found too many matches for: " + character.name);
+        const deficientChars = rosterStatus.characterStatus.deficientUnits;
+        const deficientShips = rosterStatus.shipStatus.deficientUnits;
 
-            const foundCharacter = characterCollection.find(c => c.description === lookup[0].name);
-            const rank = (foundCharacter) ? Number(foundCharacter.star) : 0;
+        const naUnits = rosterStatus.characterStatus.inactiveUnits.concat(rosterStatus.shipStatus.inactiveUnits);
 
-            if (rank < character.stars) {
-                totalRequiredShards += shardsRemainingAtStarLevel[0] - shardsRemainingAtStarLevel[character.stars];
-                totalAcquiredShards += shardsRemainingAtStarLevel[0] - shardsRemainingAtStarLevel[rank];
-                if (foundCharacter && rank) {
-                    missingCharacters.push(`${foundCharacter.star}* ${foundCharacter.level}-g${foundCharacter.gearLevel} (${foundCharacter.galacticPower}) - ${foundCharacter.description}`);
-                } else {
-                    notActivated.push(`n.a. - ${lookup[0].name}`);
-                }
-            } else {
-                // so we don't get % completions over 100, cap the acquired at the required level
-                totalRequiredShards += shardsRemainingAtStarLevel[0] - shardsRemainingAtStarLevel[character.stars];
-                totalAcquiredShards += shardsRemainingAtStarLevel[0] - shardsRemainingAtStarLevel[character.stars];
-            }
-        });
+        const progress = rosterStatus.totalProgress;
 
-        const missingShips = [];
-        requiredShips.forEach(ship => {
-            const lookup = shipsData.filter(fuzzy(ship.name, ["name", "nickname"]));
-            if (!lookup) console.log("I couldn't find: " + ship.name);
-            if (lookup.length > 1) console.log("I found too many matches for: " + ship.name);
+        const charMessage = deficientChars.length ? deficientChars.join("\n") : "None!";
+        const shipMessage = deficientShips.length ? deficientShips.join("\n") : "None!";
+        const naMessage = naUnits.length ? naUnits.join("\n") : "None!";
 
-            const foundCharacter = shipCollection.find(c => c.description === lookup[0].name);
-            const rank = (foundCharacter) ? Number(foundCharacter.star) : 0;
-
-            if (rank < ship.stars) {
-                totalRequiredShards += shardsRemainingAtStarLevel[0] - shardsRemainingAtStarLevel[ship.stars];
-                totalAcquiredShards += shardsRemainingAtStarLevel[0] - shardsRemainingAtStarLevel[rank];
-                if (foundCharacter && rank) {
-                    missingShips.push(`${foundCharacter.star}* ${foundCharacter.level} (${foundCharacter.galacticPower}) - ${foundCharacter.description}`);
-                } else {
-                    notActivated.push(`n.a. - ${lookup[0].name}`);
-                }
-            } else {
-                // so we don't get % completions over 100, cap the acquired at the required level
-                totalRequiredShards += shardsRemainingAtStarLevel[0] - shardsRemainingAtStarLevel[ship.stars];
-                totalAcquiredShards += shardsRemainingAtStarLevel[0] - shardsRemainingAtStarLevel[ship.stars];
-            }
-        });
-
-        const charMessage = missingCharacters.length ? missingCharacters.join("\n") : "None!";
-        const shipMessage = missingShips.length ? missingShips.join("\n") : "None!";
-        const naMessage = notActivated.length ? notActivated.join("\n") : "None!";
-
-        const progress = ((totalAcquiredShards / totalRequiredShards) * 100).toFixed(1);
         embed.setDescription(`\`~${progress}% complete\``);
         embed.addField("Deficient Characters", charMessage, false);
         embed.addField("Deficient Ships", shipMessage, false);

@@ -85,6 +85,9 @@ const commonCharacters = [{
     "name": "Snowtrooper",
     "stars": 5
 }, {
+    "name": "Shoretrooper",
+    "stars": 5
+}, {
     "name": "General Veers",
     "stars": 7
 }, {
@@ -97,7 +100,22 @@ const commonCharacters = [{
     "name": "Imperial Probe Droid",
     "stars": 7
 }, {
-    "name": "JTR",
+    "name": "Boba Fett",
+    "stars": 6
+}, {
+    "name": "Dengar",
+    "stars": 6
+}, {
+    "name": "Zam Wesell",
+    "stars": 6
+}, {
+    "name": "IG-88",
+    "stars": 6
+}, {
+    "name": "Greedo",
+    "stars": 6
+}, {
+    "name": "Rey (Jedi Training)",
     "stars": 7
 }, {
     "name": "R2",

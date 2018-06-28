@@ -91,7 +91,10 @@ const init = async () => {
             const chData = getObjects(charactersJS, "name", characters[i].name);
 
             if (chData.length == 1) Object.assign(characters[i], chData[0]);
-            else if (chData.length == 0) client.logger.warn(client, `No JS results found for character: ${characters[i].name}`);
+            else if (chData.length == 0) {
+                client.logger.warn(client, `No JS results found for character: ${characters[i].name}`);
+                console.log(JSON.stringify(characters[i]));
+            }
             else client.logger.warn(client, `Multiple results found for character: ${characters[i].name}`);
         }
     } catch (error) {
