@@ -36,7 +36,7 @@ module.exports = function(characterCollection, shipCollection, charactersData, s
                 if (foundCharacter && rank) {
                     responseObject.deficientUnits.push(`${foundCharacter.star}* ${foundCharacter.level}-g${foundCharacter.gearLevel} (${foundCharacter.galacticPower}) - ${foundCharacter.description}`);
                 } else {
-                    responseObject.inactiveUnits.push(`n.a. - ${lookup[0].name}`);
+                    responseObject.inactiveUnits.push(`${lookup[0].name}`);
                 }
             } else {
                 // so we don't get % completions over 100, cap the acquired at the required level

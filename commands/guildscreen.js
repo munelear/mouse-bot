@@ -1,8 +1,55 @@
 const { RichEmbed } = require("discord.js");
-const fuzzy = require("fuzzy-predicate");
 const request = require("request-promise-native");
-const requiredCharacters = require("./../modules/common-characters.js");
-const requiredShips = require("./../modules/common-ships.js");
+const fuzzy = require("fuzzy-predicate");
+const rosterAnalyzer = require("./../modules/roster-analyzer.js");
+
+function transformGuildData(guildData, charactersData, shipsData) {
+    const responseObject = {};
+
+    // initialize an object for every player
+    guildData["CLONEWARSCHEWBACCA"].forEach(player => {
+        responseObject[player.player] = {
+            "name": player.player,
+            "url": player.url,
+            "ships": [],
+            "characters": []
+        };
+    });
+    const COMBAT_TYPE_MAP = {
+        "1" : "characters",
+        "2" : "ships"
+    };
+
+    for (const base_id in guildData) {
+        const unit = guildData[base_id];
+        let unitType = "characters"; // default to characters
+
+        // look at the first player object, assume the combat type is the same for every entry
+        if (unit.length > 0) {
+            unitType = COMBAT_TYPE_MAP[unit[0].combat_type];
+        }
+        const unitData = (unitType === "characters") ? charactersData : shipsData;
+        const lookup = unitData.filter(fuzzy(base_id, ["base_id"]));
+        if (!lookup) console.log("I couldn't find: " + base_id);
+        if (lookup.length > 1) console.log("I found too many matches for: " + base_id);
+
+        const matchingUnit = lookup[0];
+
+        unit.forEach(player => {
+            // fake out enough fields to make it look like a character roster entry
+            responseObject[player.player][unitType].push({
+                "description": matchingUnit.name,
+                "imageSrc": matchingUnit.image,
+                "star": player.rarity,
+                "gearLevel": player.gear_level,
+                "level": player.level,
+                "galacticPower": player.power,
+            });
+        });
+    }
+
+    return responseObject;
+}
 
 exports.run = async (client, message, cmd, args, level) => { // eslint-disable-line no-unused-vars
 
@@ -10,10 +57,6 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
         // Pull in our swgoh databases
         const charactersData = client.swgohData.get("charactersData");
         const shipsData = client.swgohData.get("shipsData");
-
-        // Cool star emojis! Just like in the game!
-        const starEmoji = client.emojis.get("416420499078512650");
-        const inactiveStarEmoji = client.emojis.get("416422867606044683");
 
         const [id, searchText, error] = await client.profileCheck(message, args); // eslint-disable-line no-unused-vars
         if (id === undefined) return await message.reply(error).then(client.cmdError(message, cmd));
@@ -50,101 +93,45 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
             guildData = await request(options);
         } catch (error) {
             client.errlog(cmd, message, level, error);
-            client.logger.error(client, `swgoh.gg guild API pull failure within the guild command:\n${error.stack}`);
+            client.logger.error(client, `swgoh.gg guild API pull failure within the guildscreen command:\n${error.stack}`);
         }
 
+        const transformedGuildData = transformGuildData(guildData, charactersData, shipsData);
+        const playerArray = [];
 
-        for (var i = 0; i < requiredCharacters.length; i++) {
-            const character = requiredCharacters[i];
-            const lookup = charactersData.filter(fuzzy(character.name, ["name", "nickname"]));
-            if (!lookup) console.log("I couldn't find: " + character.name);
-            if (lookup.length > 1) console.log("I found too many matches for: " + character.name);
+        for (const playerName in transformedGuildData) {
+            const player = transformedGuildData[playerName];
+            const rosterStatus = rosterAnalyzer(player.characters, player.ships, charactersData, shipsData);
 
-            // Now we start pulling the character from the data
-            const characterKey = lookup[0].base_id;
-            const searchTerm = lookup[0].name;
+            // glue in some extra fields to the analysis to keep player records straight
+            rosterStatus.name = player.name;
+            rosterStatus.url = player.url;
 
-            // Error message if that base_id isn't matched with anything in the guildData
-            if (guildData[characterKey] === undefined) {
-                await guildMessage.edit(`${message.author}, I don't think anyone in ${guildName} has __${lookup[0].name}__.`);
-                continue;
-            }
+            playerArray.push(rosterStatus);
+        }
 
-            const sortedCharacterData = guildData[characterKey].sort( (p, c) => p.rarity > c.rarity ? 1 :  p.power > c.power && p.rarity === c.rarity ? 1 :  p.player > c.player && p.power === c.power ? 1 : -1 );
-            let loopStar = "";
-            let fieldTitle;
-            let fieldText;
-            let count = 0;
-            const searchRarity = character.stars;
-            const playerArray = [];
+        // sort by progress indicator, then name
+        playerArray.sort((a, b) => ((a.totalProgress - b.totalProgress) || (a.name.localeCompare(b.name))));
 
-            // Creating the embed
-            const embed = new RichEmbed()
-                .setAuthor(`${guildName}'s Key Unit Report`)
-                .setColor(0xEE7100)
-                .setTitle(lookup[0].name)
-                .setThumbnail(`https:${lookup[0].image}`)
-                .setURL(`https://swgoh.gg/g/${guildNum}/${guildInfo[3]}/unit-search/#${lookup[0].base_id}`);
+        const playerProgressMessages = [];
+        // parse out the progress information to stick in the command response
+        playerArray.forEach(player => {
+            playerProgressMessages.push(`${player.totalProgress} - ${player.name}`);
+        });
 
-            // Here we're just getting an array of everyone in the guild to use for
-            // the "Not Activated" cases
-            guildData["CLONEWARSCHEWBACCA"].forEach(d => {
-                playerArray.push(d.player);
-            });
-            sortedCharacterData.forEach(a => {
-                const removePlayer = playerArray.indexOf(a.player);
-                playerArray.splice(removePlayer, 1);
-            });
+        // Creating the embed
+        const embed = new RichEmbed()
+            .setAuthor(`${guildName}'s Key Unit Report`)
+            .setColor(0xEE7100)
+            .setURL(`https://swgoh.gg/g/${guildNum}/${guildInfo[3]}/`);
 
-            // Add the "Not Activated" field to the embed
-            if (playerArray.length > 0) {
-                const playerArraySJ = playerArray.sort().join("\n");
-                const iStarString = `${inactiveStarEmoji}`.repeat(7);
-                // If there's more than five names, split it into two columns
-                if (playerArray.length > 5) {
-                    const half = Math.round(playerArray.length / 2);
-                    embed.addField(`Not Activated (x${playerArray.length})`, playerArray.sort().slice(0, half).join("\n"), true);
-                    embed.addField("-", playerArray.sort().slice(half).join("\n"), true);
-                }
-                else embed.addField(`${iStarString}(x${playerArray.length})`, playerArraySJ, false);
-            }
+        embed.addField("Guild Report", playerProgressMessages.join("\n"), false);
+        await guildMessage.edit("Here's what I found:");
+        await message.channel.send({ embed });
 
-            sortedCharacterData.forEach(c => {
-                const characterStar = c.rarity;
-                if (characterStar < searchRarity) {
-
-                    if (loopStar !== characterStar) {
-
-                        if (fieldText != undefined) {
-                            if (fieldText.length > 950) client.splitText(fieldTitle, fieldText, embed);
-                            else embed.addField(fieldTitle, fieldText, false);
-                        }
-
-                        loopStar = characterStar;
-                        fieldText = "";
-                        count = 0;
-                    }
-
-                    if (c.gear_level == undefined) fieldText += `${c.level} (${c.power.toLocaleString()}) - ${c.player}\n`;
-                    else fieldText += `${c.level}-g${c.gear_level} (${c.power.toLocaleString()}) - ${c.player}\n`;
-                    count++;
-                    const starString = `${starEmoji}`.repeat(characterStar) + `${inactiveStarEmoji}`.repeat(7 - characterStar);
-                    fieldTitle = `${starString} (x${count})`;
-                }
-            });
-
-            // Can't forget to add the last loop
-            if (fieldText == undefined && searchRarity > 1 && searchRarity != 7) return await guildMessage.edit(`${message.author}, no one in ${guildName} has ${searchTerm} at ${searchRarity}${starEmoji} or higher.`);
-            else if (fieldText == undefined && searchRarity > 1 && searchRarity == 7) return await guildMessage.edit(`${message.author}, no one in ${guildName} has ${searchTerm} at ${searchRarity}${starEmoji}.`);
-            else if (fieldText.length > 950) client.splitText(fieldTitle, fieldText, embed);
-            else embed.addField(fieldTitle, fieldText, false);
-
-            await guildMessage.edit("Here's what I found:");
-            await message.channel.send({ embed });
-        };
     } catch (error) {
         client.errlog(cmd, message, level, error);
-        client.logger.error(client, `screen command failure:\n${error.stack}`);
+        client.logger.error(client, `guildscreen command failure:\n${error.stack}`);
         client.codeError(message);
     }
 
@@ -153,7 +140,7 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
 exports.conf = {
     enabled: true,
     guildOnly: false,
-    aliases: ["gs"],
+    aliases: ["gst"],
     arguments: ["user mention", "1-7"],
     permLevel: "User"
 };
