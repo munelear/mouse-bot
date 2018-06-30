@@ -1,6 +1,5 @@
 const { RichEmbed } = require("discord.js");
 const request = require("request-promise-native");
-const fuzzy = require("fuzzy-predicate");
 const rosterAnalyzer = require("./../modules/roster-analyzer.js");
 
 function transformGuildData(guildData, charactersData, shipsData) {
@@ -20,6 +19,22 @@ function transformGuildData(guildData, charactersData, shipsData) {
         "2" : "ships"
     };
 
+    const findMatchingUnit = (unitData, base_id) => {
+        let i = 0;
+        let matchingUnit;
+
+        while (!matchingUnit && i < unitData.length) {
+            if (base_id == unitData[i].base_id) {
+                matchingUnit = unitData[i];
+                break;
+            }
+
+            i++;
+        }
+
+        return matchingUnit;
+    };
+
     for (const base_id in guildData) {
         const unit = guildData[base_id];
         let unitType = "characters"; // default to characters
@@ -29,11 +44,8 @@ function transformGuildData(guildData, charactersData, shipsData) {
             unitType = COMBAT_TYPE_MAP[unit[0].combat_type];
         }
         const unitData = (unitType === "characters") ? charactersData : shipsData;
-        const lookup = unitData.filter(fuzzy(base_id, ["base_id"]));
-        if (!lookup) console.log("I couldn't find: " + base_id);
-        if (lookup.length > 1) console.log("I found too many matches for: " + base_id);
-
-        const matchingUnit = lookup[0];
+        const matchingUnit = findMatchingUnit(unitData, base_id);
+        if (!matchingUnit) console.log("I couldn't find: " + base_id);
 
         unit.forEach(player => {
             // fake out enough fields to make it look like a character roster entry
