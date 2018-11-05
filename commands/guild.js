@@ -30,7 +30,7 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
         // Setting up guild id and url for swgoh.gg/api
         let profile = client.cache.get(id + "_profile");
         // Only cache if needed to
-        if (profile === undefined || profile.userId === undefined) {
+        if (!profile || (profile && !profile.userId)) {
             try {
                 await client.cacheCheck(message, id, "");
                 profile = client.cache.get(id + "_profile");
@@ -39,7 +39,7 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
                 client.logger.error(client, `swgoh.gg profile pull failure within the guild command:\n${error.stack}`);
             }
         } else client.cacheCheck(message, id, ""); // If we don't need to cache, just do it in the background
-        if (profile === undefined || profile.userId === undefined) return await guildMessage.edit("I can't find a profile for that allycode").then(client.cmdError(message, cmd));
+        if (!profile || (profile && !profile.userId)) return await guildMessage.edit("I can't find a profile for that allycode").then(client.cmdError(message, cmd));
         const guildInfo = profile.guildUrl.split("/");
         const guildNum = guildInfo[2];
         let guildName = guildInfo[3].replace(/-/g, " ").toProperCase();

@@ -4,20 +4,7 @@ const rosterAnalyzer = require("./../modules/roster-analyzer.js");
 
 function transformGuildData(guildData, charactersData, shipsData) {
     const responseObject = {};
-
-    // initialize an object for every player
-    guildData["CLONEWARSCHEWBACCA"].forEach(player => {
-        responseObject[player.player] = {
-            "name": player.player,
-            "url": player.url,
-            "ships": [],
-            "characters": []
-        };
-    });
-    const COMBAT_TYPE_MAP = {
-        "1" : "characters",
-        "2" : "ships"
-    };
+    //console.log(`I got guild data: ${JSON.stringify(guildData)}`);
 
     const findMatchingUnit = (unitData, base_id) => {
         let i = 0;
@@ -35,29 +22,37 @@ function transformGuildData(guildData, charactersData, shipsData) {
         return matchingUnit;
     };
 
-    for (const base_id in guildData) {
-        const unit = guildData[base_id];
-        let unitType = "characters"; // default to characters
+    for (const player of guildData.players) {
+        responseObject[player.data.name] = {
+            "name": player.data.name,
+            "url": player.data.url,
+            "allycode": player.data.ally_code,
+            "ships": [],
+            "characters": []
+        };
 
-        // look at the first player object, assume the combat type is the same for every entry
-        if (unit.length > 0) {
-            unitType = COMBAT_TYPE_MAP[unit[0].combat_type];
-        }
-        const unitData = (unitType === "characters") ? charactersData : shipsData;
-        const matchingUnit = findMatchingUnit(unitData, base_id);
-        if (!matchingUnit) console.log("I couldn't find: " + base_id);
+        for (const unitObject of player.units) {
+            const unit = unitObject.data;
+            const base_id = unit.base_id;
 
-        unit.forEach(player => {
+            let unitType = "characters"; // default to characters
+            let matchingUnit = findMatchingUnit(charactersData, base_id);
+            if (!matchingUnit) {
+                unitType = "ships";
+                matchingUnit = findMatchingUnit(shipsData, base_id);
+            }
+            if (!matchingUnit) console.log("I couldn't find: " + base_id);
+
             // fake out enough fields to make it look like a character roster entry
-            responseObject[player.player][unitType].push({
+            responseObject[player.data.name][unitType].push({
                 "description": matchingUnit.name,
                 "imageSrc": matchingUnit.image,
-                "star": player.rarity,
-                "gearLevel": player.gear_level,
-                "level": player.level,
-                "galacticPower": player.power,
+                "star": unit.rarity,
+                "gearLevel": unit.gear_level,
+                "level": unit.level,
+                "galacticPower": unit.power,
             });
-        });
+        }
     }
 
     return responseObject;
@@ -78,7 +73,7 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
         // Setting up guild id and url for swgoh.gg/api
         let profile = client.cache.get(id + "_profile");
         // Only cache if needed to
-        if (profile === undefined || profile.userId === undefined) {
+        if (!profile || (profile && !profile.userId)) {
             try {
                 await client.cacheCheck(message, id, "");
                 profile = client.cache.get(id + "_profile");
@@ -87,11 +82,11 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
                 client.logger.error(client, `swgoh.gg profile pull failure within the guildscreen command:\n${error.stack}`);
             }
         } else client.cacheCheck(message, id, ""); // If we don't need to cache, just do it in the background
-        if (profile === undefined || profile.userId === undefined) return await guildMessage.edit("I can't find a profile for that username").then(client.cmdError(message, cmd));
+        if (!profile || (profile && !profile.userId)) return await guildMessage.edit("I can't find a profile for that username").then(client.cmdError(message, cmd));
         const guildInfo = profile.guildUrl.split("/");
         const guildNum = guildInfo[2];
         const guildName = guildInfo[3].replace(/-/g, " ").toProperCase();
-        const url = `https://swgoh.gg/api/guilds/${guildNum}/units/`;
+        const url = `https://swgoh.gg/api/guild/${guildNum}/`;
         let guildData = {};
 
         // Request options for swgoh.gg API
@@ -128,7 +123,7 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
         const playerProgressMessages = [];
         // parse out the progress information to stick in the command response
         playerArray.forEach(player => {
-            playerProgressMessages.push(`${player.totalProgress} - ${player.name}`);
+            playerProgressMessages.push(`${player.totalProgress} - ${player.name})`);
         });
 
         // Creating the embed

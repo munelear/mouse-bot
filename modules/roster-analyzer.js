@@ -27,14 +27,14 @@ module.exports = function(characterCollection, shipCollection, charactersData, s
             if (!lookup) console.log("I couldn't find: " + unit.name);
             if (lookup.length > 1) console.log("I found too many matches for: " + unit.name);
 
-            const foundCharacter = playerCollection.find(c => c.description === lookup[0].name);
+            const foundCharacter = playerCollection.find(c => (c.description.trim()) === lookup[0].name);
             const rank = (foundCharacter) ? Number(foundCharacter.star) : 0;
 
             if (rank < unit.stars) {
                 responseObject.totalRequiredShards += shardsRemainingAtStarLevel[0] - shardsRemainingAtStarLevel[unit.stars];
                 responseObject.totalAcquiredShards += shardsRemainingAtStarLevel[0] - shardsRemainingAtStarLevel[rank];
                 if (foundCharacter && rank) {
-                    responseObject.deficientUnits.push(`${foundCharacter.star}* ${foundCharacter.level}-g${foundCharacter.gearLevel} (${foundCharacter.galacticPower}) - ${foundCharacter.description}`);
+                    responseObject.deficientUnits.push(`${foundCharacter.star}* ${foundCharacter.level}-g${foundCharacter.gearLevel} (${foundCharacter.galacticPower}) - ${(foundCharacter.description).trim()}`);
                 } else {
                     responseObject.inactiveUnits.push(`${lookup[0].name}`);
                 }

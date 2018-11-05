@@ -9,13 +9,13 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
         const shipsData = client.swgohData.get("shipsData");
 
         const [id, searchText, error] = await client.profileCheck(message, args); // eslint-disable-line no-unused-vars
-        if (id === undefined) return await message.reply(error).then(client.cmdError(message, cmd));
+        if (!id) return await message.reply(error).then(client.cmdError(message, cmd));
 
         const guildMessage = await message.channel.send("Checking... One moment. 👀");
 
         let profile = client.cache.get(id + "_profile");
         // Only cache if needed to
-        if (profile === undefined || profile.userId === undefined) {
+        if (!profile || (profile && !profile.userId)) {
             try {
                 await client.cacheCheck(message, id, "cs");
                 profile = client.cache.get(id + "_profile");
@@ -24,7 +24,7 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
                 client.logger.error(client, `swgoh.gg profile pull failure within the guild command:\n${error.stack}`);
             }
         } else await client.cacheCheck(message, id, "cs");
-        if (profile === undefined || profile.userId === undefined) return await guildMessage.edit("I can't find a profile for that username").then(client.cmdError(message, cmd));
+        if (!profile || (profile && !profile.userId)) return await guildMessage.edit("I can't find a profile for that username").then(client.cmdError(message, cmd));
 
         const characterCollection = client.cache.get(id + "_collection");
         const shipCollection = client.cache.get(id + "_ships");
@@ -35,7 +35,7 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
         const embed = new RichEmbed()
             .setColor(0xEE7100)
             .setTitle(`${profile.username}'s${allyCodeDisplay} Key Units Report`)
-            .setURL(`https://swgoh.gg/u/${encodeURI(id)}/collection/`);
+            .setURL(`https://swgoh.gg/p/${id}/characters/`);
 
         const rosterStatus = rosterAnalyzer(characterCollection, shipCollection, charactersData, shipsData);
 
