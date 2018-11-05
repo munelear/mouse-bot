@@ -24,7 +24,7 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
         if (!args[0]) return client.cmdError(message, cmd);
 
         let [id, searchTerm, error] = await client.profileCheck(message, args); // eslint-disable-line prefer-const
-        if (id === undefined) return await message.reply(error).then(client.cmdError(message, cmd));
+        if (!id) return await message.reply(error).then(client.cmdError(message, cmd));
 
         // Pull in our swgoh databases
         const charactersData = client.swgohData.get("charactersData");
@@ -74,8 +74,8 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
             .setDescription("*Need Shards (current rank)*")
             .setURL("https://swgoh.gg/db/shipments/")
             .setFooter(`Last updated ${updated}`, "https://swgoh.gg/static/img/bb8.png");
-        if (searchTerm == "") embed.setAuthor(`${id.toProperCase()}'s Needs`);
-        if (searchTerm.toLowerCase() == "battles") embed.setAuthor(`${id.toProperCase()}'s Needs for Light & Dark Side Battles`);
+        if (searchTerm == "") embed.setAuthor(`${username.toProperCase()}'s Needs`);
+        if (searchTerm.toLowerCase() == "battles") embed.setAuthor(`${username.toProperCase()}'s Needs for Light & Dark Side Battles`);
 
         const charArray = [];
         const shipArray = [];
@@ -88,7 +88,7 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
             for (let i = 0; i < lookupList.length; i++) {
                 const charName = lookupList[i].name;
 
-                const foundCharacter = accountCollection.find(c => c.description === charName);
+                const foundCharacter = accountCollection.find(c => (c.description).trim() === charName);
                 const rank = (foundCharacter) ? Number(foundCharacter.star) : 0;
                 const rankDisplay = rank || "n.a.";
 

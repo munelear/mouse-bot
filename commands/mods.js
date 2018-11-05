@@ -67,7 +67,7 @@ exports.run = async (client, message, cmd, args, level) => { // eslint-disable-l
 
         // Check for a username
         const [id, searchTerm, error] = await client.profileCheck(message, args);
-        if (id === undefined) return await message.reply(error).then(client.cmdError(message, cmd));
+        if (!id) return await message.reply(error).then(client.cmdError(message, cmd));
         if (searchTerm.length < 2) return await message.reply("please use 2 or more letters to search for characters, I don't want to spam your channel with every character.");
 
         const chMessage = await message.channel.send("Checking... this may take a minute. 👀"); // wait message
@@ -110,7 +110,7 @@ Level ${lookup[i].level}  |  Gear ${lookup[i].gearLevel}
 Galactic Power: ${lookup[i].galacticPower != undefined ? lookup[i].galacticPower.toLocaleString() : lookup[i].galacticPower} *(${Math.round(lookup[i].galacticPower/lookup[i].maxGalacticPower*100)}% of max)*`)
                 .setColor(0xEE7100)
                 .setThumbnail(`https:${lookup[i].image}`)
-                .setURL(`https://swgoh.gg/u/${id.toLowerCase()}/collection/${lookup[i].code}`)
+                .setURL(`https://swgoh.gg/p/${id.toLowerCase()}/collection/${lookup[i].code}`)
                 .setFooter(`Last updated ${updated}`, "https://swgoh.gg/static/img/bb8.png");
 
                 if (lookup.length > 1) embed.setFooter(`(${(i + 1)} of ${lookup.length}) | Last updated ${updated}`, "https://swgoh.gg/static/img/bb8.png");
